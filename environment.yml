@@ -1,4 +1,26 @@
+# TO CREATE NEW CONDA ENV: conda env create -f environment.yml
+# TO ACTIVATE CREATED CONDA ENV: conda activate sugarscape
+
 name: sugarscape
 channels:
   - defaults
-prefix: C:\Users\NDSU-Prof\anaconda3\envs\sugarscape
+dependencies:
+  - python=3.12.* 
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - scipy
+  - pytorch
+  - psycopg2
+  - pip:
+    - torch
+    - matplotlib
+    - numpy
+    - pandas
+    - plotly
+    - pyarrow
+    - scipy
+    - memory-profiler
+    - multiprocess
+
