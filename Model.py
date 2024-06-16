@@ -89,7 +89,7 @@ class Model:
              "sugar", "water","target", "not_target", "vision", "model", 
              "exchange_target", "not_exchange_target", "parent", "MRS", "wealth_by_good", "sugar_utility_weight",
               "water_utility_weight", "reservation_demand", "initial_goods", "wealthiest", "reproduction_criteria", 
-               "period_savings", "period_consumption", "period_income", "temp_wealth", "num_alive_children"]
+               "period_savings", "period_consumption", "period_income", "temp_wealth", "num_alive_children", "nn"]
         
         # map representing vision of agents on the Sugarscape
         self.nav_dict = {
@@ -137,6 +137,9 @@ class Model:
         self.real_income_per_capital = 0
         self.income=0
         self.savings=0
+        self.total_num_layers = 0
+        self.total_layer_size = 0
+        self.total_replay_mem_length = 0
         self.basic_wealth_per_capita = 0 
         self.optimizer_wealth_per_capita = 0 
         self.mutate_rate = 0
@@ -226,6 +229,9 @@ class Model:
             total_sugar_weight = 0
             total_x_pos_weight = 0
             total_y_pos_weight = 0
+            total_num_layers = 0
+            total_layer_size = 0
+            total_replay_mem_length = 0
             self.rlearner_wealth_per_capita = 0
             self.learning_rates = []
             self.discount_rates = []
@@ -280,12 +286,15 @@ class Model:
                         agent.remember((state_before_action, action, reward, next_state))
                         agent.replay(batch_size=agent.replay_memory_length)
                         agent.updateParams()
-                        weights = agent.nn.fc.weight.detach().numpy()[0]
+                        weights = agent.nn.layers[0].weight.detach().numpy()[0]
                         total_water_weight += weights[2]
                         total_sugar_weight += weights[3]
                         total_x_pos_weight += weights[0]
                         total_y_pos_weight += weights[1]
                         self.total_num_bins += agent.num_bins
+                        total_num_layers += agent.n_layers
+                        total_layer_size += agent.layer_size
+                        total_replay_mem_length += agent.replay_memory_length
                         self.total_replay_memory_length += agent.replay_memory_length
 
 
@@ -337,9 +346,11 @@ class Model:
             self.income += agent.period_income 
 
         if self.model_attributes != []: # and self.plots:
-
-            self.avg_num_bins = self.total_num_bins / self.num_rlearners if self.num_rlearners > 0 else 0
-            self.avg_replay_memory_length = self.total_replay_memory_length / self.num_rlearners if self.num_rlearners > 0 else 0
+            if self.num_rlearners > 0: 
+                self.avg_num_bins = self.total_num_bins / self.num_rlearners 
+                self.avg_num_layers = total_num_layers / self.num_rlearners
+                self.avg_layer_size = total_layer_size / self.num_rlearners
+                self.avg_replay_mem_length = total_replay_mem_length / self.num_rlearners
             #print(self.reservation_ratio_list)
             #self.reservation_ratio = gmean(self.reservation_ratio_list)
             for attr in ["reservation_ratio", "mutate_rate", "price_change", "reproduction_ratio", "reproduction_criteria"]: 

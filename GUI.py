@@ -167,7 +167,7 @@ model_attributes = ["population", "total_exchanges", "total_agents_created", "to
                     "progenycount_herder_wealth_per_capita", "mutate_rate", "max_mutate_rate", 
                     "price_change", "reservation_ratio", "reproduction_criteria_water", 
                     "reproduction_criteria_sugar", "reproduction_ratio_water", "reproduction_ratio_sugar",
-                    "avg_learning_rate", "avg_discount_rate"]
+                    "avg_learning_rate", "avg_discount_rate", "avg_num_bins", "avg_replay_mem_length", "avg_num_layers", "avg_layer_size", "avg_replay_mem_length"]
 
 # Set of primary breeds to be used in the simulation
 breed_sets = [["rlearner"]]
@@ -227,7 +227,7 @@ def run_simulation(params):
 # Main loop for setting up multiprocessing
 if __name__ == '__main__':
     print("running")
-    runs = 4
+    runs = 10
     data_collecting = True  # Flag to indicate if data should be collected
     mutate = True
     genetic = True
@@ -235,7 +235,7 @@ if __name__ == '__main__':
 
     for primary_breed_set in breed_sets:
         # Parameters for multiprocessing
-        pool = multiprocess.Pool(processes=4)#multiprocess.cpu_count() - 4)  # decide how many cores to use 
+        pool = multiprocess.Pool(processes=10)#multiprocess.cpu_count() - 4)  # decide how many cores to use 
         # Initialize DataAggregator if data collection is enabled
         if data_collecting: 
              data_agg = DataAggregator(primary_breed_set, agent_attributes, model_attributes)
