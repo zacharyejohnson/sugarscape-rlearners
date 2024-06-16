@@ -189,25 +189,31 @@ class Agent:
                             self.mutate_rate = self.model.max_mutate_rate
 
             def init_nn():
-                n_input = 4  # Number of inputs in the agent's state
+                n_input = 6  # Number of inputs in the agent's state
                 if self.parent == None:
                     discount_rate = min(0.999, random.normalvariate(mu=0.95, sigma=.01))
-                    learning_rate = max(0.0001, random.normalvariate(mu=0.05, sigma=0.05))
-                    self.min_res_ratio = 0.1
-                    self.max_res_ratio = 10
+                    learning_rate = max(0.0001, random.normalvariate(mu=0.2, sigma=0.075))
+                    self.min_res_ratio = 0.2
+                    self.max_res_ratio = 5
                     self.num_bins = 100
                     self.replay_memory_length = random.randint(1, 100)
-                    self.nn = DQN(n_input, self.num_bins, discount_rate=discount_rate, learning_rate=learning_rate)
+                    self.n = random.randint(1, 10)
+                    self.n_layers = random.randint(1, 5)  # Genetically determine the number of layers
+                    self.layer_size = random.randint(32, 128)  # Genetically determine the layer size
+                    self.nn = DQN(n_input, self.num_bins, discount_rate=discount_rate, learning_rate=learning_rate, n_layers=self.n_layers, layer_size=self.layer_size)
                 else:
                     discount_rate = mutateAttr(self.parent.nn.discount_rate)
                     learning_rate = mutateAttrRate(self.parent.nn.learning_rate)
                     self.min_res_ratio = mutateAttr(self.parent.min_res_ratio)
                     self.max_res_ratio = mutateAttr(self.parent.max_res_ratio)
-                    self.num_bins = mutateAttr(self.parent.num_bins, integer=True)
+                    self.num_bins = 100  # mutateAttr(self.parent.num_bins, integer=True)
                     self.replay_memory_length = mutateAttr(self.parent.replay_memory_length, integer=True)
-                    if self.replay_memory_length > 100: 
-                         self.replay_memory_length = 100 # cap this
-                    self.nn = DQN(n_input, self.num_bins, discount_rate=discount_rate if discount_rate< .999 else .999, learning_rate=learning_rate)
+                    self.n = mutateAttr(self.parent.n, True)
+                    self.n_layers = mutateAttr(self.parent.n_layers, integer=True)
+                    self.layer_size = mutateAttr(self.parent.layer_size, integer=True)
+                    if self.replay_memory_length > 100:
+                        self.replay_memory_length = 100  # cap this
+                    self.nn = DQN(n_input, self.num_bins, discount_rate=discount_rate if discount_rate < .999 else .999, learning_rate=learning_rate, n_layers=self.n_layers, layer_size=self.layer_size)
                 self.memory = ReplayMemory(10)
 
             # TODO change this to allow for mutation later
@@ -527,11 +533,11 @@ class Agent:
         self.memory.push(*transition)
 
     def choose_action(self, state):
-        state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        normalized_state = self.get_normalized_state(state)
+        state_tensor = torch.tensor(normalized_state, dtype=torch.float32).unsqueeze(0)
         q_values = self.nn(state_tensor)
         action = torch.argmax(q_values).item()
         return action
-        
 
     def learn(self, transition):
         state, action, reward, next_state = transition
@@ -545,40 +551,36 @@ class Agent:
             return
         transitions = self.memory.sample(batch_size)
         batch = Transition(*zip(*transitions))
-        
-        state_batch = torch.tensor(np.array(batch.state), dtype=torch.float32)
+
+        state_batch = torch.tensor(np.array([self.get_normalized_state(state) for state in batch.state]), dtype=torch.float32)
         action_batch = torch.tensor(np.array(batch.action), dtype=torch.long).unsqueeze(1)
         reward_batch = torch.tensor(np.array(batch.reward), dtype=torch.float32)
-        next_state_batch = torch.tensor(np.array(batch.next_state), dtype=torch.float32)
-        
-        q_values = self.nn(state_batch).gather(1, action_batch)
-        next_q_values = self.nn(next_state_batch).max(1)[0].detach()
-        expected_q_values = reward_batch + self.nn.discount_rate * next_q_values
-        
-        loss = self.nn.loss_fn(q_values, expected_q_values.unsqueeze(1))
-        
-        self.nn.optimizer.zero_grad()
-        loss.backward()
-        self.nn.optimizer.step()
-    
+        next_state_batch = torch.tensor(np.array([self.get_normalized_state(next_state) for next_state in batch.next_state]), dtype=torch.float32)
+
+        for _ in range(self.n):
+            self.nn.update(state_batch, action_batch, reward_batch, next_state_batch, self.nn.discount_rate, self.n)
+
     def get_state(self):
         norm_row = (self.row - (self.model.rows / 2)) / (self.model.rows)
         norm_col = (self.col - (self.model.cols / 2)) / (self.model.cols)
+        movement_embedding = [self.dx, self.dy]  # Add movement embedding
         return np.array([norm_row,
                         norm_col,
                         self.wealth_by_good["water"] / self.reproduction_criteria["water"],
-                        self.wealth_by_good["sugar"] / self.reproduction_criteria["sugar"]])
+                        self.wealth_by_good["sugar"] / self.reproduction_criteria["sugar"]] + movement_embedding)
+            
          
-         
-    def normalized_state(self):
-        # Normalized or raw state representation
-        norm_row = (self.row - (self.model.rows / 2)) / (self.model.rows)
-        norm_col = (self.col - (self.model.cols / 2)) / (self.model.cols)
-        # Include other state elements relevant to learning
-        return np.array([norm_row,
-                        norm_col,
-                        self.wealth_by_good["water"] / self.reproduction_criteria["water"],
-                        self.wealth_by_good["sugar"] / self.reproduction_criteria["sugar"]])
+    def get_normalized_state(self, state):
+        stored_states = self.memory.get_all_states()
+
+        if len(stored_states) > 0:
+            min_values = np.min(stored_states, axis=0)
+            max_values = np.max(stored_states, axis=0)
+            normalized_state = (state - min_values) / (max_values - min_values + 1e-8)
+        else:
+            normalized_state = state
+
+        return normalized_state
 
     def weighted_rr(self, neurons):
         return np.dot(neurons, np.array([self.dx, self.dy, self.wealth_by_good["water"], self.wealth_by_good["sugar"]]))
