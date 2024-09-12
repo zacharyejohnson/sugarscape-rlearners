@@ -213,7 +213,15 @@ class Agent:
                     self.nn = DoubleDQN(n_input, self.num_bins, discount_rate=discount_rate,
                                         learning_rate=learning_rate,
                                         n_layers=self.n_layers, layer_size=self.layer_size)
-                    self.epsilon_greedy = EpsilonGreedy()
+                    self.epsilon_start = max(0.1, min(1.0, np.random.normal(scale=0.8, loc=0.1)))
+                    self.epsilon_end = min(0.9, max(0.01, np.random.normal(scale=0.1, loc=0.01)))
+                    self.epsilon_decay = min(0.01, max(0.00000001, np.random.normal(scale=0.001, loc=0.001)))
+                    self.epsilon_greedy = EpsilonGreedy(start=self.epsilon_start, end=self.epsilon_end, decay=self.epsilon_decay)
+                    self.alpha = max(0.1, min(0.9999999, np.random.normal(scale=0.8, loc=0.1)))
+                    self.beta = 1 - self.alpha
+                    self.beta_increment = min(0.1, max(0.000001, np.random.normal(scale=0.001, loc=0.001)))
+
+                    self.memory = PrioritizedReplayBuffer(alpha=self.alpha, beta=self.beta, beta_increment=self.beta_increment, capacity=100)
                     self.reward_normalizer = RewardNormalizer()
                 else:
                     discount_rate = min(0.999999, max(0.5, mutateAttr(self.parent.nn.online_network.discount_rate)))
@@ -231,12 +239,21 @@ class Agent:
                         self.replay_memory_length = 100  # cap this
                     self.nn = DoubleDQN(n_input, self.num_bins, discount_rate=discount_rate if discount_rate < .999 else .999,
                                   learning_rate=learning_rate, n_layers=self.n_layers, layer_size=self.layer_size)
-                self.memory = PrioritizedReplayBuffer(capacity=100)
-                self.nn = DoubleDQN(n_input, self.num_bins, discount_rate=discount_rate,
+                    self.epsilon_start = mutateAttrRate(self.parent.epsilon_start)
+                    self.epsilon_end = mutateAttrRate(self.parent.epsilon_end)
+                    self.epsilon_decay = mutateAttrRate(self.parent.epsilon_decay)
+                    self.epsilon_greedy = EpsilonGreedy(start=self.epsilon_start, end=self.epsilon_end,
+                                                        decay=self.epsilon_decay)
+                    self.alpha = mutateAttrRate(self.parent.alpha)
+                    self.beta = 1 - self.alpha
+                    self.beta_increment = mutateAttrRate(self.parent.beta_increment)
+
+                    self.memory = PrioritizedReplayBuffer(alpha=self.alpha, beta=self.beta,
+                                                          beta_increment=self.beta_increment, capacity=100)
+                    self.nn = DoubleDQN(n_input, self.num_bins, discount_rate=discount_rate,
                                         learning_rate=learning_rate,
                                         n_layers=self.n_layers, layer_size=self.layer_size)
-                self.epsilon_greedy = EpsilonGreedy()
-                self.reward_normalizer = RewardNormalizer()
+                    self.reward_normalizer = RewardNormalizer()
 
             # TODO change this to allow for mutation later
             # def select_rlearner_params():
