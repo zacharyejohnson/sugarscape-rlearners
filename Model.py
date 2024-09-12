@@ -6,16 +6,18 @@ import random
 import math
 from randomdict import RandomDict
 from Patch import *
-import numpy as np 
+import numpy as np
 import matplotlib
 import gc
 from Agent import Agent
 from memory_profiler import memory_usage
 from scipy.stats.mstats import gmean
-matplotlib.use('TkAgg',force=True)
+
+matplotlib.use('TkAgg', force=True)
 from matplotlib import pyplot as plt
-import numbers 
+import numbers
 import plotly.graph_objects as go
+
 
 class Model:
     def __init__(self, gui, num_agents, mutate, genetic, live_visual, plots, agent_attributes,
@@ -61,17 +63,17 @@ class Model:
         self.init_res_ratio_ranges = {"min": 0.5, "max": 2}
 
         # initial bounds for goods endowment for first generation of agents 
-        self.goods_params = {good:{"min":25,
-                                   "max":75} for good in self.goods}
+        self.goods_params = {good: {"min": 25,
+                                    "max": 75} for good in self.goods}
 
         # rates of good consumption 
-        self.consumption_rate = {"water" : 1.5, 
+        self.consumption_rate = {"water": 1.5,
                                  "sugar": 1.5}
 
         # initial range of reproduction ratio
-        self.init_reproduction_ratio_ranges = {good: {"min": 1, 
+        self.init_reproduction_ratio_ranges = {good: {"min": 1,
                                                       "max": 5} for good in self.goods}
-        
+
         # tracker for total agents created
         self.total_agents_created = 0
 
@@ -86,21 +88,24 @@ class Model:
 
         # attributes not to be included in inheritance
         self.drop_attr = ["col", "row", "dx", "dy", "id", "wealth", "top_wealth",
-             "sugar", "water","target", "not_target", "vision", "model", 
-             "exchange_target", "not_exchange_target", "parent", "MRS", "wealth_by_good", "sugar_utility_weight",
-              "water_utility_weight", "reservation_demand", "initial_goods", "wealthiest", "reproduction_criteria", 
-               "period_savings", "period_consumption", "period_income", "temp_wealth", "num_alive_children", "nn"]
-        
+                          "sugar", "water", "target", "not_target", "vision", "model",
+                          "exchange_target", "not_exchange_target", "parent", "MRS", "wealth_by_good",
+                          "sugar_utility_weight",
+                          "water_utility_weight", "reservation_demand", "initial_goods", "wealthiest",
+                          "reproduction_criteria",
+                          "period_savings", "period_consumption", "period_income", "temp_wealth", "num_alive_children",
+                          "nn"]
+
         # map representing vision of agents on the Sugarscape
         self.nav_dict = {
-            v:{
-                i:{
+            v: {
+                i: {
                     j: True for j in range(-v, v + 1) if 0 < (i ** 2 + j ** 2) <= (v ** 2)}
                 for i in range(-v, v + 1)}
             for v in range(1, self.max_vision + 1)}
 
         # initialization of model environment - growing the Sugarscape
-        self.sugarMap = pd.read_csv('sugar-map.txt', header = None, sep = ' ')
+        self.sugarMap = pd.read_csv('sugar-map.txt', header=None, sep=' ')
         for key in self.sugarMap:
             self.sugarMap[key] = self.sugarMap[key].add(1)
 
@@ -115,8 +120,6 @@ class Model:
         self.data_dict = {}
         for attribute in self.attributes:
             self.data_dict[attribute] = {}
-       
-
 
         # initialization of variables used for tracking model attributes
         self.transaction_prices = {good: [1] for good in self.goods}
@@ -128,27 +131,33 @@ class Model:
         self.total_avg_price = 1
         self.total_exchanges = 0
         self.price_variance = 0
-        self.preference_variance = 0 
-        self.population = len(self.agent_dict) 
-        self.optimizer_MRS = 1 
+        self.preference_variance = 0
+        self.population = len(self.agent_dict)
+        self.optimizer_MRS = 1
         self.agent_wealth = 0
         self.runtime = 0
         self.avg_mutation_rate = 0
         self.real_income_per_capital = 0
-        self.income=0
-        self.savings=0
+        self.income = 0
+        self.savings = 0
         self.total_num_layers = 0
         self.total_layer_size = 0
         self.total_replay_mem_length = 0
-        self.basic_wealth_per_capita = 0 
-        self.optimizer_wealth_per_capita = 0 
+        self.basic_wealth_per_capita = 0
+        self.optimizer_wealth_per_capita = 0
         self.mutate_rate = 0
-        self.price_change = 0 
+        self.price_change = 0
         self.reservation_ratio = 1
         self.total_num_bins = 0
         self.total_replay_memory_length = 0
         self.basic_mutatable_vars = ["reproduction_criteria", "reproduction_ratio"]
-        
+        self.avg_replay_frequency = 0
+        self.avg_learning_rate = 0
+        self.avg_discount_rate = 0
+        self.avg_num_bins = 0
+        self.avg_replay_mem_length = 0
+        self.avg_num_layers = 0
+        self.avg_layer_size = 0
 
     def initializePatches(self):
         """
@@ -213,17 +222,15 @@ class Model:
         else:
             return None, None
 
-
-
-    def simulate_interactions(self, period): 
+    def simulate_interactions(self, period):
         agent_list = list(self.agent_dict.values())
         random.shuffle(agent_list)
-        if self.model_attributes != []: # and self.plots: 
+        if self.model_attributes != []:  # and self.plots:
             self.num_herders = 0
-            self.num_optimizers = 0 
+            self.num_optimizers = 0
             self.num_basics = 0
-            self.num_wealth_herders = 0 
-            self.num_progenycount_herders = 0 
+            self.num_wealth_herders = 0
+            self.num_progenycount_herders = 0
             self.num_rlearners = 0
             total_water_weight = 0
             total_sugar_weight = 0
@@ -232,148 +239,150 @@ class Model:
             total_num_layers = 0
             total_layer_size = 0
             total_replay_mem_length = 0
+            self.total_num_bins = 0
+            self.total_replay_memory_length = 0
             self.rlearner_wealth_per_capita = 0
             self.learning_rates = []
             self.discount_rates = []
 
             self.all_prices = []
-     
+
             self.mutate_rate_list = []
             self.price_change_list = []
             self.reservation_ratio_list = []
-            for attr in self.basic_mutatable_vars: 
+            self.replay_frequencies = []
+            for attr in self.basic_mutatable_vars:
                 # if not isinstance(getattr(agent_list[0], attr), dict):
                 #         setattr(self, attr + "_list", [])
-                # else: 
-                    for key in getattr(agent_list[0], attr).keys(): 
-                        setattr(self, attr + "_" +  key + "_list", [])
+                # else:
+                for key in getattr(agent_list[0], attr).keys():
+                    setattr(self, attr + "_" + key + "_list", [])
 
         self.agent_wealth = 0
         self.consumption = 0
-        self.savings = 0 
-        self.income = 0 
-        self.basic_wealth = 0 
-        self.optimizer_wealth = 0 
-        self.herder_wealth_per_capita = 0 
-        self.wealth_herder_wealth_per_capita = 0 
-        self.progenycount_herder_wealth_per_capita = 0 
-        
+        self.savings = 0
+        self.income = 0
+        self.basic_wealth = 0
+        self.optimizer_wealth = 0
+        self.herder_wealth_per_capita = 0
+        self.wealth_herder_wealth_per_capita = 0
+        self.progenycount_herder_wealth_per_capita = 0
+
         for agent in agent_list:
-            
-                    temp_wealth = agent.calculate_market_cap()
-                    temp_water = agent.wealth_by_good["water"]
-                    temp_sugar = agent.wealth_by_good["sugar"]
 
+            temp_wealth = agent.calculate_market_cap()
+            temp_water = agent.wealth_by_good["water"]
+            temp_sugar = agent.wealth_by_good["sugar"]
 
-                    state_before_action = agent.get_state()  # Assuming you have a method to get the current state
-                    action = agent.reservation_ratio
+            state_before_action = agent.get_state()  # Assuming you have a method to get the current state
+            action = agent.reservation_ratio
 
+            agent.move()
+            agent.harvest()
+            agent.trade()
+            agent.consume()
+            agent.check_alive()
+            agent.reproduce()
+            agent.updateParams()
 
-                    agent.move()
-                    agent.harvest()
-                    agent.trade()
-                    agent.consume()
-                    agent.check_alive()
-                    agent.reproduce()
-                    agent.updateParams()
+            reward = agent.calculate_market_cap() - temp_wealth
+            agent.period_savings_by_good["water"] = agent.wealth_by_good["water"] - temp_water
+            agent.period_savings_by_good["sugar"] = agent.wealth_by_good["sugar"] - temp_sugar
 
-                    reward = agent.calculate_market_cap() - temp_wealth
-                    agent.period_savings_by_good["water"] = agent.wealth_by_good["water"] - temp_water
-                    agent.period_savings_by_good["sugar"] = agent.wealth_by_good["sugar"] - temp_sugar
+            if agent.rlearner:
+                next_state = agent.get_state()  # Get the new state after performing actions
+                agent.remember(state_before_action, action, reward, next_state)
+                #if period % agent.replay_frequency == 0:
+                agent.replay(batch_size=agent.replay_memory_length)
+                agent.updateParams()
+                weights = agent.nn.online_network.layers[0].weight.cpu().detach().numpy()[0]
+                total_water_weight += weights[2]
+                total_sugar_weight += weights[3]
+                total_x_pos_weight += weights[0]
+                total_y_pos_weight += weights[1]
+                self.total_num_bins += agent.num_bins
+                total_num_layers += agent.n_layers
+                total_layer_size += agent.layer_size
+                total_replay_mem_length += agent.replay_memory_length
+                self.total_replay_memory_length += agent.replay_memory_length
 
-                    if agent.rlearner:
-                        next_state = agent.get_state()  # Get the new state after performing actions
-                        agent.remember((state_before_action, action, reward, next_state))
-                        agent.replay(batch_size=agent.replay_memory_length)
-                        agent.updateParams()
-                        weights = agent.nn.layers[0].weight.detach().numpy()[0]
-                        total_water_weight += weights[2]
-                        total_sugar_weight += weights[3]
-                        total_x_pos_weight += weights[0]
-                        total_y_pos_weight += weights[1]
-                        self.total_num_bins += agent.num_bins
-                        total_num_layers += agent.n_layers
-                        total_layer_size += agent.layer_size
-                        total_replay_mem_length += agent.replay_memory_length
-                        self.total_replay_memory_length += agent.replay_memory_length
+            agent.period_savings = agent.wealth - (temp_water + temp_sugar)
+            agent.period_income = agent.period_consumption + agent.period_savings
 
+            # #agent statistics tracking
+            if self.model_attributes != []:
+                if agent.herder:
+                    self.num_herders += 1
+                    self.herder_wealth_per_capita += agent.wealth
+                    if agent.herding_metric == "wealth":
+                        self.num_wealth_herders += 1
+                        self.wealth_herder_wealth_per_capita += agent.wealth
+                    else:
+                        self.num_progenycount_herders += 1
+                        self.progenycount_herder_wealth_per_capita += agent.wealth
 
-                        
-                    agent.period_savings = agent.wealth - temp_wealth
-                    agent.period_income = agent.period_consumption + agent.period_savings
+                if agent.basic:
+                    self.basic_wealth += agent.wealth
+                    self.num_basics += 1
 
-                        # #agent statistics tracking 
-                    if self.model_attributes != []: 
-                        if agent.herder: 
-                            self.num_herders += 1
-                            self.herder_wealth_per_capita += agent.wealth
-                            if agent.herding_metric == "wealth": 
-                                self.num_wealth_herders += 1
-                                self.wealth_herder_wealth_per_capita += agent.wealth
-                            else: 
-                                self.num_progenycount_herders += 1
-                                self.progenycount_herder_wealth_per_capita += agent.wealth
+                if agent.optimizer:
+                    self.optimizer_wealth += agent.wealth
+                    self.num_optimizers += 1
+                if agent.rlearner:
+                    self.num_rlearners += 1
+                    self.rlearner_wealth_per_capita += agent.wealth
+                    self.learning_rates.append(agent.nn.online_network.learning_rate)
+                    self.discount_rates.append(agent.nn.online_network.discount_rate)
+                    self.replay_frequencies.append(agent.replay_frequency)
 
-                        if agent.basic: 
-                            self.basic_wealth += agent.wealth
-                            self.num_basics += 1
-                            
-                        if agent.optimizer: 
-                            self.optimizer_wealth += agent.wealth
-                            self.num_optimizers += 1
-                        if agent.rlearner:
-                            self.num_rlearners += 1
-                            self.rlearner_wealth_per_capita += agent.wealth
-                            self.learning_rates.append(agent.nn.learning_rate)
-                            self.discount_rates.append(agent.nn.discount_rate)
-                            
-                        self.reservation_ratio_list.append(agent.reservation_ratio)
-                        self.mutate_rate_list.append(agent.mutate_rate)
-                        self.price_change_list.append(agent.price_change)
-                        for attr in self.basic_mutatable_vars:
-                            #if hasattr(agent, attr): 
-                                # if not isinstance(getattr(agent, attr), dict): 
-                                #     getattr(self, attr+"_list").append(getattr(agent, attr))
-                                # else: 
-                                    for key in getattr(agent, attr).keys(): 
-                                        getattr(self, attr + "_" + key + "_list").append(getattr(agent, attr)[key])
-                        
+                self.reservation_ratio_list.append(agent.reservation_ratio)
+                self.mutate_rate_list.append(agent.mutate_rate)
+                self.price_change_list.append(agent.price_change)
+                for attr in self.basic_mutatable_vars:
+                    # if hasattr(agent, attr):
+                    # if not isinstance(getattr(agent, attr), dict):
+                    #     getattr(self, attr+"_list").append(getattr(agent, attr))
+                    # else:
+                    for key in getattr(agent, attr).keys():
+                        getattr(self, attr + "_" + key + "_list").append(getattr(agent, attr)[key])
 
         for agent in self.agent_dict.values():
             self.agent_wealth += agent.wealth
             self.consumption += agent.period_consumption
-            self.savings += agent.period_savings 
-            self.income += agent.period_income 
+            self.savings += agent.period_savings
+            self.income += agent.period_income
 
-        if self.model_attributes != []: # and self.plots:
-            if self.num_rlearners > 0: 
-                self.avg_num_bins = self.total_num_bins / self.num_rlearners 
+        if self.model_attributes != []:  # and self.plots:
+            if self.num_rlearners > 0:
+                self.avg_num_bins = self.total_num_bins / self.num_rlearners
                 self.avg_num_layers = total_num_layers / self.num_rlearners
                 self.avg_layer_size = total_layer_size / self.num_rlearners
                 self.avg_replay_mem_length = total_replay_mem_length / self.num_rlearners
-            #print(self.reservation_ratio_list)
-            #self.reservation_ratio = gmean(self.reservation_ratio_list)
-            for attr in ["reservation_ratio", "mutate_rate", "price_change", "reproduction_ratio", "reproduction_criteria"]: 
-                    
-                    if not isinstance(getattr(agent, attr), dict): 
-                        #if period == 1:
-                            #print(attr + "\n\n\n" , getattr(self, attr+"_list"))
-                        if attr == "reservation_ratio": 
-                            setattr(self, attr, gmean(getattr(self, attr+"_list")))
-                        else: 
-                            if len(getattr(self, attr+"_list")) > 0: 
-                                setattr(self, attr, np.average(getattr(self, attr+"_list")))
-                    else: 
-                        for key in getattr(agent, attr).keys(): 
-                            if len(getattr(self, attr+"_"+key+"_list")) > 0: 
-                                setattr(self, attr + "_" + key, np.average(getattr(self, attr+"_"+key+"_list")))
+                self.avg_replay_frequency = sum(self.replay_frequencies) / len(self.replay_frequencies)
+            # print(self.reservation_ratio_list)
+            # self.reservation_ratio = gmean(self.reservation_ratio_list)
+            for attr in ["reservation_ratio", "mutate_rate", "price_change", "reproduction_ratio",
+                         "reproduction_criteria"]:
+
+                if not isinstance(getattr(agent, attr), dict):
+                    # if period == 1:
+                    # print(attr + "\n\n\n" , getattr(self, attr+"_list"))
+                    if attr == "reservation_ratio":
+                        setattr(self, attr, gmean(getattr(self, attr + "_list")))
+                    else:
+                        if len(getattr(self, attr + "_list")) > 0:
+                            setattr(self, attr, np.average(getattr(self, attr + "_list")))
+                else:
+                    for key in getattr(agent, attr).keys():
+                        if len(getattr(self, attr + "_" + key + "_list")) > 0:
+                            setattr(self, attr + "_" + key, np.average(getattr(self, attr + "_" + key + "_list")))
 
             self.preference_variance = np.std(self.reservation_ratio_list)
 
-    def runModel(self, periods):           
+    def runModel(self, periods):
         # Update the plot at each period
         for period in range(1, periods + 1):
-            
+
             self.cw = self.consumption_rate["water"]
             self.cs = self.consumption_rate["sugar"]
             # Simulate the agents interacting
@@ -381,74 +390,70 @@ class Model:
             self.growPatches()
             setattr(self, "population", len(self.agent_dict))
             if self.population == 0:
-                 break 
+                break
 
             self.simulate_interactions(period)
-            
+
             setattr(self, "wealth_per_capita", self.agent_wealth / self.population)
 
             setattr(self, "real_income_per_capital", self.income / self.population)
 
-            if self.num_wealth_herders > 0: 
-
+            if self.num_wealth_herders > 0:
                 self.wealth_herder_wealth_per_capita /= self.num_wealth_herders
 
-            if self.num_progenycount_herders > 0: 
-
+            if self.num_progenycount_herders > 0:
                 self.progenycount_herder_wealth_per_capita /= self.num_progenycount_herders
 
-            if self.num_basics > 0: 
+            if self.num_basics > 0:
                 setattr(self, "basic_wealth_per_capita", getattr(self, "basic_wealth") / self.num_basics)
-            if self.num_optimizers > 0: 
+            if self.num_optimizers > 0:
                 setattr(self, "optimizer_wealth_per_capita", getattr(self, "optimizer_wealth") / self.num_optimizers)
-            if self.num_herders > 0: 
+            if self.num_herders > 0:
                 self.herder_wealth_per_capita /= self.num_herders
             if self.num_rlearners > 0:
                 self.rlearner_wealth_per_capita /= self.num_rlearners
                 self.avg_learning_rate = sum(self.learning_rates) / len(self.learning_rates)
                 self.avg_discount_rate = sum(self.discount_rates) / len(self.discount_rates)
 
-            if period > 1: 
-               
-                if len(self.all_prices) > 0: 
+            if period > 1:
+
+                if len(self.all_prices) > 0:
                     avg_total = gmean(self.all_prices)
                     setattr(self, "price_variance", np.std(self.all_prices))
-                else: 
+                else:
                     avg_total = 1
 
-                    self.price_variance = 0 
-              
+                    self.price_variance = 0
+
                 setattr(self, "total_avg_price", avg_total)
 
-            #if period == 1:
-                #print("mutate rate: " + str(self.mutate_rate))
+            # if period == 1:
+            # print("mutate rate: " + str(self.mutate_rate))
 
-            
-                
             end1 = time.time()
-            self.runtime = end1-start1
+            self.runtime = end1 - start1
             self.collectData(str(period))
-            #gc.collect()
-            #if period == 1: 
-                #print(self.data_dict)
-            
-            if period % 100 == 0: 
+            # gc.collect()
+            # if period == 1:
+            # print(self.data_dict)
+
+            if period % 100 == 0:
                 print(period, self.runtime, self.population)
                 print("reservation_ratio: " + str(self.reservation_ratio))
                 gc.collect()
 
-            if self.live_visual and period % self.GUI.every_t_frames_GUI == 0: 
+            if self.live_visual and period % self.GUI.every_t_frames_GUI == 0:
                 self.GUI.updatePatches()
                 self.GUI.moveAgents()
                 self.GUI.canvas.update()
 
             if period == periods:
-                mem_usage = memory_usage(-1, interval=1)#, timeout=1)
-                print(period, "end memory usage before sync//collect:", mem_usage[0], sep = "\t")
+                mem_usage = memory_usage(-1, interval=1)  # , timeout=1)
+                print(period, "end memory usage before sync//collect:", mem_usage[0], sep="\t")
                 gc.collect()
-                mem_usage = memory_usage(-1, interval=1)#, timeout=1)
-                print(period, "end memory usage after sync//collect:", mem_usage[0], sep = "\t")
-                
+                mem_usage = memory_usage(-1, interval=1)  # , timeout=1)
+                print(period, "end memory usage after sync//collect:", mem_usage[0], sep="\t")
+
         if self.plots:
             self.plot_data()
 
@@ -462,15 +467,16 @@ class Model:
         for i, (variable, data) in enumerate(self.data_dict.items()):
             fig.add_trace(
                 go.Scatter(x=list(self.data_dict["total_exchanges"]),
-                        y=list(data.values()),
-                        name=variable,
-                        visible=False,
-                        line=dict(color="black"))
+                           y=list(data.values()),
+                           name=variable,
+                           visible=False,
+                           line=dict(color="black"))
             )
 
-        buttons = [{"label": variable, "method": "update", "args": [{"visible": [key == variable for key in self.data_dict.keys()]},
-                                                                    {"title": variable, "annotations": []}]}
-                for variable in self.data_dict.keys()]
+        buttons = [{"label": variable, "method": "update",
+                    "args": [{"visible": [key == variable for key in self.data_dict.keys()]},
+                             {"title": variable, "annotations": []}]}
+                   for variable in self.data_dict.keys()]
 
         # Add separate traces for neural network parameter analysis
         # nn_param_traces = self.analyze_nn_params()
@@ -478,14 +484,14 @@ class Model:
         #     fig.add_trace(trace)
 
         # Add buttons for neural network parameter analysis plots
-    #     buttons.extend([
-    #         {"label": "Average Input Weights", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [True, False, False]},
-    #                                                                         {"title": "Average Input Weights", "annotations": []}]},
-    #         {"label": "Average Number of Bins", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [False, True, False]},
-    #                                                                         {"title": "Average Number of Bins", "annotations": []}]},
-    #         {"label": "Average Replay Memory Length", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [False, False, True]},
-    #                                                                                 {"title": "Average Replay Memory Length", "annotations": []}]}
-    #     ])
+        #     buttons.extend([
+        #         {"label": "Average Input Weights", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [True, False, False]},
+        #                                                                         {"title": "Average Input Weights", "annotations": []}]},
+        #         {"label": "Average Number of Bins", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [False, True, False]},
+        #                                                                         {"title": "Average Number of Bins", "annotations": []}]},
+        #         {"label": "Average Replay Memory Length", "method": "update", "args": [{"visible": [False] * len(self.data_dict) + [False, False, True]},
+        #                                                                                 {"title": "Average Replay Memory Length", "annotations": []}]}
+        #     ])
 
         fig.update_layout(
             updatemenus=[
@@ -626,30 +632,29 @@ class Model:
     #                             visible=True))
 
     #     return fig
-    
+
     def growPatches(self):
         for row in self.patches_dict:
             for patch in self.patches_dict[row].values():
                 if patch.Q < patch.maxQ:
                     patch.Q += 1
 
-
     def collectData(self, period):
-        
+
         def collectAgentAttributes():
-            temp_dict={}
+            temp_dict = {}
             for attribute in self.agent_attributes:
                 temp_dict[attribute] = []
             for ID, agent in self.agent_dict.items():
                 for attribute in self.agent_attributes:
-                    temp_dict[attribute].append(getattr(agent, attribute)) 
-            
+                    temp_dict[attribute].append(getattr(agent, attribute))
+
             for attribute, val in temp_dict.items():
                 self.data_dict[attribute][period] = np.mean(val)
 
         def collectModelAttributes():
             for attribute in self.model_attributes:
                 self.data_dict[attribute][period] = getattr(self, attribute)
-                
-        #collectAgentAttributes()
+
+        # collectAgentAttributes()
         collectModelAttributes()

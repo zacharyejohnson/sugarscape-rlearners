@@ -1,12 +1,13 @@
 import os
 import time
 import random
-import multiprocess
+import multiprocessing
 from tkinter import Tk, Canvas
 from DataAggregator import DataAggregator
 from memory_profiler import memory_usage
 import gc
 from Model import Model
+
 
 class GUI:
     """
@@ -14,10 +15,10 @@ class GUI:
     It creates and manages the visualization of agents and patches, and integrates with the model for simulation runs.
     """
 
-    def __init__(self, name, run, num_agents, live_visual, plots, model_primary_breeds, 
-                every_t_frames_GUI=1, every_t_frames_plots=100, 
-                mutate=True, genetic=True, agent_attributes=None, 
-                model_attributes=None):
+    def __init__(self, name, run, num_agents, live_visual, plots, model_primary_breeds,
+                 every_t_frames_GUI=1, every_t_frames_plots=100,
+                 mutate=True, genetic=True, agent_attributes=None,
+                 model_attributes=None):
         """
         Initializes the GUI with the given parameters and creates the visualization components if live_visual is True.
 
@@ -41,13 +42,14 @@ class GUI:
         self.name = name
         self.run = run
         self.plots = plots
-        self.model = Model(self, num_agents, mutate, genetic, live_visual, plots, agent_attributes, model_attributes, primary_breeds=model_primary_breeds)
+        self.model = Model(self, num_agents, mutate, genetic, live_visual, plots, agent_attributes, model_attributes,
+                           primary_breeds=model_primary_breeds)
         self.dimPatch = 16
         self.live_visual = live_visual
         self.every_t_frames_GUI = every_t_frames_GUI
         self.every_t_frames_plots = every_t_frames_plots
 
-        if self.live_visual: 
+        if self.live_visual:
             canvasWidth = self.model.cols * self.dimPatch
             canvasHeight = self.model.rows * self.dimPatch
             self.canvas = Canvas(self.parent, width=canvasWidth, height=canvasHeight, background="white")
@@ -55,7 +57,7 @@ class GUI:
             self.drawPatches()
             self.drawAgents()
             self.canvas.update()
-            
+
     def drawPatches(self):
         """
         Draws the patches on the canvas using the patch attributes from the model.
@@ -129,6 +131,18 @@ class GUI:
             for patch in self.model.patches_dict[i].values():
                 self.canvas.itemconfig(patch.image, fill=self.color(patch.Q, patch.good))
 
+    # def verify_patches_consistency(self):
+    #     for i in range(self.rows):
+    #         for j in range(self.cols):
+    #             if self.patches_array[i, j].agent is None:
+    #                 if (i, j) not in self.empty_patches:
+    #                     print(f"Inconsistency found: Patch ({i}, {j}) is empty but not in empty_patches")
+    #                     self.empty_patches.add((i, j))
+    #             else:
+    #                 if (i, j) in self.empty_patches:
+    #                     print(f"Inconsistency found: Patch ({i}, {j}) has an agent but is in empty_patches")
+    #                     self.empty_patches.remove((i, j))
+
     def color(self, q, good):
         """
         Determines the color for a patch based on its quantity and type.
@@ -160,26 +174,28 @@ class GUI:
 agent_attributes = []  # Attributes like "water", "sugar", "wealth", etc. (currently empty)
 model_attributes = ["population", "total_exchanges", "total_agents_created", "total_avg_price",
                     "runtime", "agent_wealth", "price_variance", "preference_variance", "cw", "cs",
-                    "real_income_per_capital", "wealth_per_capita", "savings", "income", "consumption", 
-                    "num_optimizers", "num_herders", "num_basics", "num_rlearners", "basic_wealth_per_capita", 
-                    "optimizer_wealth_per_capita", "rlearner_wealth_per_capita", "num_wealth_herders", "num_progenycount_herders",
-                    "herder_wealth_per_capita", "wealth_herder_wealth_per_capita", 
-                    "progenycount_herder_wealth_per_capita", "mutate_rate", "max_mutate_rate", 
-                    "price_change", "reservation_ratio", "reproduction_criteria_water", 
+                    "real_income_per_capital", "wealth_per_capita", "savings", "income", "consumption",
+                    "num_optimizers", "num_herders", "num_basics", "num_rlearners", "basic_wealth_per_capita",
+                    "optimizer_wealth_per_capita", "rlearner_wealth_per_capita", "num_wealth_herders",
+                    "num_progenycount_herders",
+                    "herder_wealth_per_capita", "wealth_herder_wealth_per_capita",
+                    "progenycount_herder_wealth_per_capita", "mutate_rate", "max_mutate_rate",
+                    "price_change", "reservation_ratio", "reproduction_criteria_water",
                     "reproduction_criteria_sugar", "reproduction_ratio_water", "reproduction_ratio_sugar",
-                    "avg_learning_rate", "avg_discount_rate", "avg_num_bins", "avg_replay_mem_length", "avg_num_layers", "avg_layer_size", "avg_replay_mem_length"]
+                    "avg_learning_rate", "avg_discount_rate", "avg_num_bins", "avg_replay_mem_length", "avg_num_layers",
+                    "avg_layer_size", "avg_replay_mem_length", "avg_replay_frequency"]
 
 # Set of primary breeds to be used in the simulation
-breed_sets = [["rlearner"]]
-
+breed_sets = [["rlearner"], ["rlearner", "basic"], ["rlearner", "optimizer"], ["basic", "optimizer"], ["rlearner", "basic", "optimizer"]]
 # Number of runs and periods for the simulation
-#runs = 5
-#periods = 10000
+# runs = 5
+# periods = 10000
 data_collecting = True  # Flag to indicate if data should be collected
+
 
 # Main loop for running simulations
 def run_simulation(params):
-    primary_breed_set, mutate, genetic, run, data_collecting, agent_attributes,model_attributes, data_agg = params
+    primary_breed_set, mutate, genetic, run, data_collecting, agent_attributes, model_attributes, data_agg = params
 
     periods = 10000 if primary_breed_set in [["basic", "optimizer"], ["optimizer"]] else 10000
 
@@ -191,23 +207,22 @@ def run_simulation(params):
     print(mutate, genetic, sep="\t")
     print("trial", "agents", "periods", "time", sep="\t")
 
-
     # Running multiple simulation runs
-    #for run in range(runs):
+    # for run in range(runs):
     mem_usage = memory_usage(-1, interval=1)
     print(run, "mem:", str(int(mem_usage[0])) + " MB", sep="\t")
 
     num_agents = 200
     start = time.time()
     gui_instance = GUI(name + str(run), run, num_agents, live_visual=False, plots=True,
-                    model_primary_breeds=primary_breed_set, mutate=True, genetic=True,
-                    agent_attributes=agent_attributes, model_attributes=model_attributes)
-    
+                       model_primary_breeds=primary_breed_set, mutate=True, genetic=True,
+                       agent_attributes=agent_attributes, model_attributes=model_attributes)
+
     # Running the model for the specified number of periods
     gui_instance.model.runModel(periods)
 
     # Saving run data and cleaning up if data collection is enabled
-    if data_collecting: 
+    if data_collecting:
         data_agg.saveRun(gui_instance.name, str(gui_instance.run), gui_instance.model.data_dict)
         del gui_instance.model.data_dict
         gc.collect()
@@ -224,40 +239,38 @@ def run_simulation(params):
 
     return
 
+
 # Main loop for setting up multiprocessing
 if __name__ == '__main__':
     print("running")
-    runs = 10
+    runs = 5
     data_collecting = True  # Flag to indicate if data should be collected
     mutate = True
     genetic = True
-    
 
     for primary_breed_set in breed_sets:
         # Parameters for multiprocessing
-        pool = multiprocess.Pool(processes=10)#multiprocess.cpu_count() - 4)  # decide how many cores to use 
+        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count() - 2)  # decide how many cores to use
         # Initialize DataAggregator if data collection is enabled
-        if data_collecting: 
-             data_agg = DataAggregator(primary_breed_set, agent_attributes, model_attributes)
-             data_agg.prepSetting()
+        if data_collecting:
+            data_agg = DataAggregator(primary_breed_set, agent_attributes, model_attributes)
+            data_agg.prepSetting()
         tasks = []
         for run in range(runs):
-            tasks.append((primary_breed_set, mutate, genetic, run, data_collecting, agent_attributes, model_attributes, data_agg))
-
-        
+            tasks.append((primary_breed_set, mutate, genetic, run, data_collecting, agent_attributes, model_attributes,
+                          data_agg))
 
         # Run simulations in parallel and close pool
-        with pool as p: 
+        with pool as p:
             p.map(run_simulation, tasks)
             p.close()
 
         # Saving and cleaning up data if data collection is enabled
-        if data_collecting: 
+        if data_collecting:
             data_agg.saveDistributionByPeriodWithParquet("sugarscape", runs)
-            
-    if data_collecting:         
-            for primary_breed_set in breed_sets: 
-                data_agg.set_folder(primary_breed_set)
 
-                data_agg.remove_parquet()
+    if data_collecting:
+        for primary_breed_set in breed_sets:
+            data_agg.set_folder(primary_breed_set)
 
+            data_agg.remove_parquet()
